@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+
+<body>
+  <!-- 1. The <iframe> (and video player) will replace this <div> tag. -->
+  <div id="player"></div>
+
+  <script>
+    // 2. This code loads the IFrame Player API code asynchronously.
+    var tag = document.createElement('script');
+
+    tag.src = "https://www.youtube.com/iframe_api";
+    var firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+
+    var firstTime = true;
+    var yt_player;
+
+    function onStateChange(event) {
+      if (event.data === YT.PlayerState.CUED) {
+        event.target.playVideo();
+      }
+    }
+ 
+    function onYouTubeIframeAPIReady() {
+      const socket = new WebSocket(((location.protocol === "http:") ? "ws://" : "wss://") + location.host + "/feed" + location.pathname);
+      socket.addEventListener("message", (event) => {
+        let event_data = JSON.parse(event.data);
+        console.log(event_data)
+        if (event_data.id && event_data.id.length !== 11) {
+          return;
+        }
+        if (firstTime) {
+          yt_player = new YT.Player('player', {
+            height: '390',
+            width: '640',
+            videoId: event_data.id,
+            playerVars: {
+              'playsinline': 1,
+              'disablekb': 1,
+              'controls': 0,
+            },
+            events: {
+              'onReady': event_data.playing ? (evt) => {
+                // playing
+                if (event_data.seek != 0) {
+                  evt.target.seekTo(event_data.progress, true)
+                }
+                evt.target.playVideo();
+              } : (evt) => {
+                if (event_data.seek != 0) {
+                  evt.target.seekTo(event_data.progress, true)
+                }
+              },
+              'onStateChange': onStateChange
+            }
+          });
+          
+          firstTime = false;
+          return;
+        }
+        if (event_data.type === 0) {
+          yt_player.cueVideoById(event_data.id, event_data.progress);
+          if (event_data.playing) {
+            yt_player.playVideo();
+          } else {
+            yt_player.pauseVideo();
+          }
+        } else if (event_data.type === 1) {
+          if (event_data.playing) {
+            yt_player.playVideo();
+          } else {
+            yt_player.pauseVideo();
+          }
+        } else if (event_data.type === 2) {
+          yt_player.seekTo(event_data.progress, true);
+        }
+      });
+    }
+  </script>
+</body>
+
+</html>
