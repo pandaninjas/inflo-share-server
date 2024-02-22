@@ -74,7 +74,6 @@ async def feed(request: Request, ws: Websocket, connection_id: str):
     data = await app.ctx.db.hgetall("ID$" + connection_id)
     await app.ctx.db.expire("ID$" + connection_id, 24 * 60 * 60)
     data = {k.decode(): v.decode() for k, v in data.items()}
-    print(data)
     data = {
         "type": 0,
         "playing": data["playing"] == "1",
