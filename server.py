@@ -4,6 +4,8 @@ import os, base64, time, json as json_module
 import redis.asyncio as redis
 from typing import TYPE_CHECKING
 
+EXPIRY_TIME = 60 * 60 * 24
+
 app = Sanic("Inflo-Sharing-Server")
 app.ctx.db: redis.Redis = redis.from_url(os.environ.get("INFLO_REDIS_URL", "redis://localhost"))
 
@@ -28,10 +30,10 @@ async def start(_):
         connection_id = base64.urlsafe_b64encode(os.urandom(16)).decode("utf-8")
 
     await app.ctx.db.set(
-        "SECRET$" + secret, "ID$" + connection_id, ex=60 * 60 * 12
+        "SECRET$" + secret, "ID$" + connection_id, ex=EXPIRY_TIME
     )  # 12 hours
     await app.ctx.db.hmset("ID$" + connection_id, {"playing": 1, "id": ""})
-    await app.ctx.db.expire("ID$" + connection_id, 24 * 60 * 60)
+    await app.ctx.db.expire("ID$" + connection_id, EXPIRY_TIME)
 
     return json({"secret": secret, "id": connection_id})
 
@@ -72,7 +74,7 @@ async def feed(request: Request, ws: Websocket, connection_id: str):
         return json({"status": "fail"})
 
     data = await app.ctx.db.hgetall("ID$" + connection_id)
-    await app.ctx.db.expire("ID$" + connection_id, 24 * 60 * 60)
+
     data = {k.decode(): v.decode() for k, v in data.items()}
     data = {
         "type": 0,
